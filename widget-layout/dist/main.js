@@ -2,6 +2,10 @@
 // iPhone 小组件位置/尺寸可视化编辑器
 // 编译：tsc -p tsconfig.json  →  dist/main.js
 const EXPORT_SCALE = 3; // Pro 系列为 @3x
+// 壁纸裁剪原点校正（pt）。来源：HANDOFF.md 截图 2c2af0e6 的实测偏移。
+// 小组件内壁纸的真实原点 = 工具坐标 + (CROP_FIX_X, CROP_FIX_Y)，预览与导出共用。
+const CROP_FIX_X = -2.0;
+const CROP_FIX_Y = 25.8;
 const SCREEN_RADIUS = 55; // 屏幕圆角（pt，估计值）
 const WIDGET_RADIUS = 22; // 小组件圆角（pt，估计值）
 const ROW_GAP = 22; // 行间距（pt，估计值）
@@ -132,7 +136,7 @@ function render() {
         el.style.width = `${wd.w * ds}px`;
         el.style.height = `${wd.h * ds}px`;
         el.style.borderRadius = `${WIDGET_RADIUS * ds}px`;
-        applyWallpaper(el, d, wd.x, wd.y);
+        applyWallpaper(el, d, wd.x + CROP_FIX_X, wd.y + CROP_FIX_Y);
         const tag = document.createElement('span');
         tag.className = 'tag';
         tag.textContent = `${KIND_LABEL[wd.kind]}${i + 1}  ${wd.w}×${wd.h}`;
@@ -345,8 +349,8 @@ async function exportPng() {
     g.drawImage(img, c.ox * P, c.oy * P, c.dw * P, c.dh * P);
     const list = layoutOf(d);
     for (const [i, wd] of list.entries()) {
-        const sx = Math.round(wd.x * P);
-        const sy = Math.round(wd.y * P);
+        const sx = Math.round((wd.x + CROP_FIX_X) * P);
+        const sy = Math.round((wd.y + CROP_FIX_Y) * P);
         const sw = Math.round(wd.w * P);
         const sh = Math.round(wd.h * P);
         const out = document.createElement('canvas');
