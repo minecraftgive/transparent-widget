@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iPhone 小组件布局编辑器</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+         display: flex; min-height: 100vh; background: #1b1d22; color: #e8e8ea; }
+  aside { width: 300px; padding: 18px; background: #23262d; overflow-y: auto; flex-shrink: 0; }
+  aside h1 { font-size: 17px; margin: 0 0 12px; }
+  aside h2 { font-size: 13px; color: #9aa0aa; margin: 18px 0 8px; font-weight: 600; }
+  label { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; }
+  label.chk { flex-direction: row; align-items: center; gap: 6px; }
+  select, input[type=number], input[type=file] { background: #15171b; color: #e8e8ea;
+         border: 1px solid #3a3f49; border-radius: 6px; padding: 5px 7px; font: inherit; width: 100%; }
+  input[type=number] { width: 100%; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px;
+           font: inherit; cursor: pointer; }
+  button:hover { filter: brightness(1.1); }
+  button.danger { background: #b91c1c; }
+  button.ghost { background: #3a3f49; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .row button { flex: 1; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  fieldset:disabled { opacity: .45; }
+  #hint { font-size: 12px; color: #9aa0aa; margin: 8px 0; min-height: 1.4em; }
+  .size-row { display: grid; grid-template-columns: 22px 1fr 1fr auto; gap: 6px; align-items: center; margin: 6px 0; }
+  .size-row span { color: #9aa0aa; }
+  .size-row button { padding: 5px 6px; font-size: 12px; background: #3a3f49; }
+  #status { font-size: 12px; color: #9aa0aa; min-height: 1.4em; margin-top: 12px; }
+
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; }
+  #screen { position: relative; overflow: hidden; background: #000;
+            box-shadow: 0 0 0 10px #0b0c0e, 0 20px 60px rgba(0,0,0,.6); background-repeat: no-repeat; }
+  #screen.nowp { background: linear-gradient(160deg, #5b7fb8 0%, #9fb6d6 45%, #c9a27e 100%); }
+  #widgets { position: absolute; inset: 0; }
+  .w { position: absolute; box-sizing: border-box; cursor: move; background-repeat: no-repeat;
+       background-origin: border-box; border: 1px dashed rgba(255,255,255,.55); }
+  #screen.nowp .w { background-color: rgba(255,255,255,.18); }
+  .w.tint { box-shadow: inset 0 0 0 999px rgba(20,22,30,.35); }
+  .w.sel { outline: 2px solid #3b82f6; outline-offset: 1px; }
+  .w.bad { outline: 2px solid #ef4444; outline-offset: 1px; }
+  .w.warn { outline: 2px dashed #f59e0b; outline-offset: 1px; }
+  .w .tag { position: absolute; left: 6px; top: 4px; font-size: 11px; color: #fff; background: rgba(0,0,0,.5);
+            padding: 1px 6px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
+  .w .handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 50%;
+               background: #fff; border: 2px solid #3b82f6; cursor: nwse-resize; }
+  .note { font-size: 12px; color: #9aa0aa; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>小组件布局</h1>
+  <label>机型
+    <select id="device"></select>
+  </label>
+  <label>壁纸图片
+    <input type="file" id="wallpaper" accept="image/*">
+  </label>
+  <label>吸附步长 (pt)
+    <select id="snap">
+      <option value="0.5">0.5</option>
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="5">5</option>
+    </select>
+  </label>
+  <label class="chk"><input type="checkbox" id="tint"> 预览时显示底色遮罩</label>
+
+  <h2>添加组件</h2>
+  <div class="row">
+    <button data-add="small">+ 小</button>
+    <button data-add="medium">+ 中</button>
+    <button data-add="large">+ 大</button>
+  </div>
+
+  <h2>选中组件</h2>
+  <fieldset id="inspector" disabled>
+    <label>类型
+      <select id="kind">
+        <option value="small">小</option>
+        <option value="medium">中</option>
+        <option value="large">大</option>
+      </select>
+    </label>
+    <div class="grid2">
+      <label>x (pt)<input type="number" id="x" step="0.5"></label>
+      <label>y (pt)<input type="number" id="y" step="0.5"></label>
+      <label>宽 w (pt)<input type="number" id="w" step="0.5"></label>
+      <label>高 h (pt)<input type="number" id="h" step="0.5"></label>
+    </div>
+    <div class="row">
+      <button id="apply-size" class="ghost">恢复默认尺寸</button>
+      <button id="delete" class="danger">删除</button>
+    </div>
+    <p id="hint"></p>
+  </fieldset>
+
+  <h2>默认尺寸（本机型，可编辑）</h2>
+  <div id="size-table"></div>
+
+  <h2>导出 / 导入</h2>
+  <div class="row">
+    <button id="export-png">导出裁剪 PNG</button>
+    <button id="export-json" class="ghost">导出布局 JSON</button>
+  </div>
+  <label>导入布局 JSON
+    <input type="file" id="import-json" accept="application/json">
+  </label>
+  <div class="row"><button id="reset" class="ghost">重置本机型</button></div>
+  <p id="status"></p>
+</aside>
+
+<main>
+  <div id="screen"><div id="widgets"></div></div>
+  <p class="note">拖动移动 · 拖右下角缩放 · 方向键微调（Shift 为 10pt）· Delete 删除</p>
+</main>
+
+<script>
+"use strict";
+// iPhone 小组件位置/尺寸可视化编辑器
+// 编译：tsc -p tsconfig.json  →  dist/main.js
+const EXPORT_SCALE = 3; // Pro 系列为 @3x
+const SCREEN_RADIUS = 55; // 屏幕圆角（pt，估计值）
+const WIDGET_RADIUS = 22; // 小组件圆角（pt，估计值）
+const ROW_GAP = 22; // 行间距（pt，估计值）
+const MIN_SIZE = 40;
+const DOCK_ZONE = 120; // 底部 Dock 区域高度（pt，估计值）
+const STORE_KEY = 'widget-layout-v1';
+const KIND_LABEL = { small: '小', medium: '中', large: '大' };
+// 尺寸为估计的默认值，可在页面右侧“默认尺寸”表中直接修改
+const DEVICES = [
+    // iPhone 18 Pro：屏幕 402×874 pt，与 16 Pro 相同；小组件尺寸沿用同级机型，需按实机确认
+    { id: 'pro18', name: 'iPhone 18 Pro (402×874)', w: 402, h: 874, top: 62,
+        sizes: { small: { w: 171, h: 171 }, medium: { w: 364, h: 171 }, large: { w: 364, h: 382 } } },
+    { id: 'pro16', name: 'iPhone 16 Pro (402×874)', w: 402, h: 874, top: 62,
+        sizes: { small: { w: 171, h: 171 }, medium: { w: 364, h: 171 }, large: { w: 364, h: 382 } } },
+    { id: 'pro16max', name: 'iPhone 16 Pro Max (440×956)', w: 440, h: 956, top: 62,
+        sizes: { small: { w: 185, h: 185 }, medium: { w: 380, h: 185 }, large: { w: 380, h: 400 } } },
+    { id: 'pro15', name: 'iPhone 15 Pro (393×852)', w: 393, h: 852, top: 62,
+        sizes: { small: { w: 169, h: 169 }, medium: { w: 360, h: 169 }, large: { w: 360, h: 376 } } },
+    { id: 'pro15max', name: 'iPhone 15 Pro Max (430×932)', w: 430, h: 932, top: 62,
+        sizes: { small: { w: 181, h: 181 }, medium: { w: 380, h: 181 }, large: { w: 380, h: 391 } } },
+];
+const state = {
+    deviceId: 'pro18',
+    sizes: {},
+    layouts: {},
+    selected: null,
+    snap: 1,
+    tint: false,
+    img: null,
+    ds: 1, // 预览缩放：屏幕像素 / pt
+    nextId: 1,
+};
+// ---------- 工具函数 ----------
+function $(id) {
+    const el = document.getElementById(id);
+    if (!el)
+        throw new Error(`缺少元素 #${id}`);
+    return el;
+}
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+const snap = (v) => Math.round(v / state.snap) * state.snap;
+const setStatus = (msg) => { $('status').textContent = msg; };
+function device() {
+    return DEVICES.find(d => d.id === state.deviceId) ?? DEVICES[0];
+}
+function sizesOf(d) {
+    if (!state.sizes[d.id])
+        state.sizes[d.id] = JSON.parse(JSON.stringify(d.sizes));
+    return state.sizes[d.id];
+}
+function mkWidget(d, kind, x, y) {
+    const s = sizesOf(d)[kind];
+    return { id: state.nextId++, kind, x, y, w: s.w, h: s.h };
+}
+// 默认布局：两个小组件在顶部（左右对齐安全边距），中号在其下
+function defaultLayout(d) {
+    const s = sizesOf(d);
+    const m = (d.w - s.medium.w) / 2;
+    return [
+        mkWidget(d, 'small', m, d.top),
+        mkWidget(d, 'small', d.w - m - s.small.w, d.top),
+        mkWidget(d, 'medium', m, d.top + s.small.h + ROW_GAP),
+    ];
+}
+function layoutOf(d) {
+    if (!state.layouts[d.id])
+        state.layouts[d.id] = defaultLayout(d);
+    return state.layouts[d.id];
+}
+function selectedWidget() {
+    return layoutOf(device()).find(w => w.id === state.selected);
+}
+function issueOf(d, wd, all) {
+    if (wd.x < 0 || wd.y < 0 || wd.x + wd.w > d.w || wd.y + wd.h > d.h) {
+        return { level: 'bad', text: '超出屏幕' };
+    }
+    const overlap = all.some(o => o.id !== wd.id && wd.x < o.x + o.w && o.x < wd.x + wd.w && wd.y < o.y + o.h && o.y < wd.y + wd.h);
+    if (overlap)
+        return { level: 'bad', text: '与其他组件重叠' };
+    if (wd.y + wd.h > d.h - DOCK_ZONE)
+        return { level: 'warn', text: '可能压到 Dock' };
+    return null;
+}
+// 壁纸按 aspect-fill 铺满屏幕（与系统壁纸一致的居中裁切）
+function cover(d, img) {
+    const sc = Math.max(d.w / img.naturalWidth, d.h / img.naturalHeight);
+    const dw = img.naturalWidth * sc;
+    const dh = img.naturalHeight * sc;
+    return { dw, dh, ox: (d.w - dw) / 2, oy: (d.h - dh) / 2 };
+}
+// ---------- 预览渲染 ----------
+function applyWallpaper(el, d, x, y) {
+    const img = state.img;
+    if (!img) {
+        el.style.backgroundImage = '';
+        el.style.backgroundSize = '';
+        el.style.backgroundPosition = '';
+        return;
+    }
+    const ds = state.ds;
+    const c = cover(d, img);
+    el.style.backgroundImage = `url("${img.src}")`;
+    el.style.backgroundSize = `${c.dw * ds}px ${c.dh * ds}px`;
+    // 元素内的背景 = 壁纸在屏幕坐标中的位置减去元素自身原点，形成“透明”效果
+    el.style.backgroundPosition = `${(c.ox - x) * ds}px ${(c.oy - y) * ds}px`;
+}
+function render() {
+    const d = device();
+    const ds = Math.min(600 / d.h, 1.2);
+    state.ds = ds;
+    const screen = $('screen');
+    screen.style.width = `${d.w * ds}px`;
+    screen.style.height = `${d.h * ds}px`;
+    screen.style.borderRadius = `${SCREEN_RADIUS * ds}px`;
+    screen.classList.toggle('nowp', !state.img);
+    applyWallpaper(screen, d, 0, 0);
+    const wrap = $('widgets');
+    wrap.innerHTML = '';
+    const all = layoutOf(d);
+    all.forEach((wd, i) => {
+        const issue = issueOf(d, wd, all);
+        const el = document.createElement('div');
+        el.className = ['w', wd.id === state.selected ? 'sel' : '', state.tint ? 'tint' : '',
+            issue ? issue.level : ''].filter(Boolean).join(' ');
+        el.dataset.id = String(wd.id);
+        el.style.left = `${wd.x * ds}px`;
+        el.style.top = `${wd.y * ds}px`;
+        el.style.width = `${wd.w * ds}px`;
+        el.style.height = `${wd.h * ds}px`;
+        el.style.borderRadius = `${WIDGET_RADIUS * ds}px`;
+        applyWallpaper(el, d, wd.x, wd.y);
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = `${KIND_LABEL[wd.kind]}${i + 1}  ${wd.w}×${wd.h}`;
+        const handle = document.createElement('i');
+        handle.className = 'handle';
+        el.append(tag, handle);
+        wrap.appendChild(el);
+    });
+    syncInspector();
+    renderSizeTable();
+    save();
+}
+// ---------- 右侧面板 ----------
+function syncInspector() {
+    const wd = selectedWidget();
+    $('inspector').disabled = !wd;
+    if (!wd) {
+        $('hint').textContent = '点击屏幕上的组件以选中';
+        return;
+    }
+    $('kind').value = wd.kind;
+    for (const k of ['x', 'y', 'w', 'h']) {
+        $(k).value = String(wd[k]);
+    }
+    const issue = issueOf(device(), wd, layoutOf(device()));
+    $('hint').textContent = issue ? `⚠ ${issue.text}` : '位置正常';
+}
+function numInput(value, onChange) {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '0.5';
+    input.value = String(value);
+    input.addEventListener('change', () => {
+        const v = Number(input.value);
+        if (Number.isFinite(v) && v > 0)
+            onChange(v);
+        render();
+    });
+    return input;
+}
+function renderSizeTable() {
+    const d = device();
+    const s = sizesOf(d);
+    const table = $('size-table');
+    table.innerHTML = '';
+    ['small', 'medium', 'large'].forEach(kind => {
+        const row = document.createElement('div');
+        row.className = 'size-row';
+        const label = document.createElement('span');
+        label.textContent = KIND_LABEL[kind];
+        const wIn = numInput(s[kind].w, v => { s[kind].w = v; });
+        const hIn = numInput(s[kind].h, v => { s[kind].h = v; });
+        const apply = document.createElement('button');
+        apply.textContent = '应用到全部';
+        apply.title = '把本机型所有该类型组件改为此尺寸';
+        apply.addEventListener('click', () => {
+            layoutOf(d).filter(x => x.kind === kind).forEach(x => { x.w = s[kind].w; x.h = s[kind].h; });
+            render();
+        });
+        row.append(label, wIn, hIn, apply);
+        table.appendChild(row);
+    });
+}
+function deleteSelected() {
+    const list = layoutOf(device());
+    const i = list.findIndex(w => w.id === state.selected);
+    if (i < 0)
+        return;
+    list.splice(i, 1);
+    state.selected = null;
+    render();
+}
+function bindInspector() {
+    for (const k of ['x', 'y', 'w', 'h']) {
+        $(k).addEventListener('change', () => {
+            const wd = selectedWidget();
+            const v = Number($(k).value);
+            if (!wd || !Number.isFinite(v))
+                return;
+            wd[k] = (k === 'w' || k === 'h') ? Math.max(MIN_SIZE, v) : v;
+            render();
+        });
+    }
+    $('kind').addEventListener('change', e => {
+        const wd = selectedWidget();
+        if (!wd)
+            return;
+        wd.kind = e.target.value;
+        const s = sizesOf(device())[wd.kind];
+        wd.w = s.w;
+        wd.h = s.h;
+        render();
+    });
+    $('apply-size').addEventListener('click', () => {
+        const wd = selectedWidget();
+        if (!wd)
+            return;
+        const s = sizesOf(device())[wd.kind];
+        wd.w = s.w;
+        wd.h = s.h;
+        render();
+    });
+    $('delete').addEventListener('click', deleteSelected);
+    document.querySelectorAll('[data-add]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const d = device();
+            const kind = (btn.dataset.add ?? 'small');
+            const s = sizesOf(d)[kind];
+            const wd = mkWidget(d, kind, (d.w - s.w) / 2, d.top);
+            layoutOf(d).push(wd);
+            state.selected = wd.id;
+            render();
+        });
+    });
+}
+// ---------- 拖动 / 缩放 ----------
+function onPointerDown(e) {
+    const target = e.target;
+    const el = target.closest('.w');
+    if (!el) {
+        state.selected = null;
+        render();
+        return;
+    }
+    e.preventDefault();
+    const d = device();
+    const wd = layoutOf(d).find(w => w.id === Number(el.dataset.id));
+    if (!wd)
+        return;
+    state.selected = wd.id;
+    const resizing = target.classList.contains('handle');
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const start = { x: wd.x, y: wd.y, w: wd.w, h: wd.h };
+    const move = (ev) => {
+        const dx = (ev.clientX - sx) / state.ds;
+        const dy = (ev.clientY - sy) / state.ds;
+        if (resizing) {
+            wd.w = clamp(snap(start.w + dx), MIN_SIZE, d.w - wd.x);
+            wd.h = clamp(snap(start.h + dy), MIN_SIZE, d.h - wd.y);
+        }
+        else {
+            wd.x = clamp(snap(start.x + dx), 0, d.w - wd.w);
+            wd.y = clamp(snap(start.y + dy), 0, d.h - wd.h);
+        }
+        render();
+    };
+    const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    render();
+}
+function onKeyDown(e) {
+    const t = e.target;
+    if (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')
+        return;
+    const wd = selectedWidget();
+    if (!wd)
+        return;
+    const step = e.shiftKey ? 10 : 1;
+    const moves = {
+        ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+    };
+    const m = moves[e.key];
+    if (m) {
+        e.preventDefault();
+        const d = device();
+        wd.x = clamp(wd.x + m[0], 0, d.w - wd.w);
+        wd.y = clamp(wd.y + m[1], 0, d.h - wd.h);
+        render();
+    }
+    else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteSelected();
+    }
+}
+// ---------- 导出 ----------
+function saveBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function canvasToBlob(c) {
+    return new Promise((resolve, reject) => {
+        c.toBlob(b => (b ? resolve(b) : reject(new Error('导出失败'))), 'image/png');
+    });
+}
+// 按设备实际像素（@3x）渲染整屏壁纸，再逐个裁出小组件
+async function exportPng() {
+    const img = state.img;
+    if (!img) {
+        setStatus('请先上传壁纸再导出');
+        return;
+    }
+    const d = device();
+    const P = EXPORT_SCALE;
+    const full = document.createElement('canvas');
+    full.width = Math.round(d.w * P);
+    full.height = Math.round(d.h * P);
+    const g = full.getContext('2d');
+    if (!g)
+        return;
+    const c = cover(d, img);
+    g.drawImage(img, c.ox * P, c.oy * P, c.dw * P, c.dh * P);
+    const list = layoutOf(d);
+    for (const [i, wd] of list.entries()) {
+        const sx = Math.round(wd.x * P);
+        const sy = Math.round(wd.y * P);
+        const sw = Math.round(wd.w * P);
+        const sh = Math.round(wd.h * P);
+        const out = document.createElement('canvas');
+        out.width = sw;
+        out.height = sh;
+        out.getContext('2d')?.drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
+        const blob = await canvasToBlob(out);
+        saveBlob(blob, `${d.id}_${wd.kind}_${i + 1}_${wd.w}x${wd.h}.png`);
+        await new Promise(r => setTimeout(r, 300)); // 避免浏览器拦截连续下载
+    }
+    setStatus(`已导出 ${list.length} 张裁剪图（纯裁剪，不含预览的遮罩）`);
+}
+function exportJson() {
+    const data = { sizes: state.sizes, layouts: state.layouts };
+    saveBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'widget-layout.json');
+    setStatus('布局已导出为 widget-layout.json');
+}
+function applySaved(data) {
+    if (!data || typeof data !== 'object' || !data.layouts)
+        throw new Error('格式不正确');
+    state.sizes = data.sizes ?? {};
+    state.layouts = data.layouts;
+    const ids = Object.values(state.layouts).flat().map(w => w.id);
+    state.nextId = Math.max(0, ...ids) + 1;
+    state.selected = null;
+}
+function save() {
+    try {
+        const data = { sizes: state.sizes, layouts: state.layouts };
+        localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    }
+    catch {
+        // 隐私模式等情况下忽略
+    }
+}
+function load() {
+    try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw)
+            applySaved(JSON.parse(raw));
+    }
+    catch {
+        // 数据损坏则使用默认布局
+    }
+}
+// ---------- 初始化 ----------
+function init() {
+    load();
+    const sel = $('device');
+    DEVICES.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d.id;
+        o.textContent = d.name;
+        sel.appendChild(o);
+    });
+    sel.value = state.deviceId;
+    sel.addEventListener('change', () => {
+        state.deviceId = sel.value;
+        state.selected = null;
+        render();
+    });
+    $('snap').addEventListener('change', e => {
+        state.snap = Number(e.target.value);
+    });
+    $('tint').addEventListener('change', e => {
+        state.tint = e.target.checked;
+        render();
+    });
+    $('wallpaper').addEventListener('change', e => {
+        const f = e.target.files?.[0];
+        if (!f)
+            return;
+        const img = new Image();
+        img.onload = () => {
+            state.img = img;
+            setStatus(`壁纸已加载：${img.naturalWidth}×${img.naturalHeight}`);
+            render();
+        };
+        img.src = URL.createObjectURL(f);
+    });
+    $('export-png').addEventListener('click', () => { void exportPng(); });
+    $('export-json').addEventListener('click', exportJson);
+    $('import-json').addEventListener('change', async (e) => {
+        const f = e.target.files?.[0];
+        if (!f)
+            return;
+        try {
+            applySaved(JSON.parse(await f.text()));
+            setStatus('布局已导入');
+            render();
+        }
+        catch (err) {
+            setStatus(`导入失败：${err.message}`);
+        }
+    });
+    $('reset').addEventListener('click', () => {
+        const id = state.deviceId;
+        delete state.layouts[id];
+        delete state.sizes[id];
+        state.selected = null;
+        render();
+        setStatus('已重置本机型的布局与尺寸');
+    });
+    $('widgets').addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    bindInspector();
+    render();
+}
+init();
+
+</script>
+</body>
+</html>
